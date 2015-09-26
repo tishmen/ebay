@@ -1,9 +1,8 @@
 import sys
 import json
-import math
 import requests
-from datetime import datetime
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 
 def uniquify(products):
@@ -32,6 +31,7 @@ def parse_products(soup):
     products = []
     for result in soup.select('.sresult'):
         id_ = result['listingid']
+        url = result.select_one('.lvtitle a')['href']
         title = result.select_one('.lvtitle a').string
         image = result.select_one('.lvpic img')['src']
         span = result.select_one('.prc span')
@@ -40,6 +40,7 @@ def parse_products(soup):
         price = float(span.get_text().strip().split('$')[-1].replace(',', ''))
         product = {
             'id': id_,
+            'url': url,
             'title': title,
             'image': image,
             'price': price
@@ -50,17 +51,18 @@ def parse_products(soup):
 
 
 def scrape_products(seller):
-    page = 1
-    start_url = 'http://www.ebay.com/sch/m.html?_ssn={}&_ipg=200&_pgn={}'
-    soup = do_request(start_url.format(seller, page))
-    products = parse_products(soup)
-    product_count = int(soup.select_one('.rcnt').string.replace(',', ''))
-    page_count = int(math.ceil(product_count / 200.0))
-    for i in range(page, page_count):
-        soup = do_request(start_url.format(seller, i + 1))
+    products = []
+    url = 'http://www.ebay.com/sch/m.html?_ssn={}&_pgn=1&_skc=0&_ipg=200&LH_S'\
+        'old=1'.format(seller)
+    while True:
+        soup = do_request(url)
         products.extend(parse_products(soup))
-    print('parsed total {} products'.format(len(products)))
-    return uniquify(products)
+        next_url = soup.select_one('.pagn-next a')
+        if not next_url or next_url.get('aria-disabled'):
+            break
+        url = next_url['href'].replace('&rt=nc', '&_ipg=200&LH_Sold=1')
+    print('got total {} products'.format(len(products)))
+    return products
 
 
 if __name__ == '__main__':
