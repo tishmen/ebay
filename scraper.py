@@ -37,6 +37,52 @@ class Scraper(object):
         return BeautifulSoup(response.content, 'html.parser')
 
 
+class EbayScraper(Scraper):
+
+    def uniquify(self, data):
+        unique = []
+        seen = []
+        for entry in data:
+            if entry['id'] in seen:
+                continue
+            seen.append(entry['id'])
+            unique.append(entry)
+        print('removed {} duplicates'.format(len(data) - len(unique)))
+        return unique
+
+    def parse_products(self, soup):
+        products = []
+        for result in soup.select('.sresult'):
+            id_ = result['listingid']
+            url = result.select_one('.lvtitle a')['href']
+            image = result.select_one('.lvpic img')['src']
+            product = {
+                'id': id_,
+                'url': url,
+                'image': image,
+            }
+            products.append(product)
+        print('parsed {} products'.format(len(products)))
+        return products
+
+    def scrape(self, seller):
+        products = []
+        url = 'http://www.ebay.com/sch/m.html?_ssn={}&_pgn=1&_skc=0&_ipg=200&'\
+            'LH_Sold=1&LH_Complete=1'.format(seller)
+        while True:
+            soup = self.get_soup(url)
+            products.extend(self.parse_products(soup))
+            next_url = soup.select_one('.pagn-next a')
+            if not next_url or next_url.get('aria-disabled'):
+                break
+            url = next_url['href'].replace(
+                '&rt=nc', '&_ipg=200&LH_Sold=1&LH_Complete=1'
+            )
+        products = self.uniquify(products)
+        print('got total {} products'.format(len(products)))
+        return products
+
+
 class GoogleScraper(Scraper):
 
     def uniquify(self, data):
@@ -76,54 +122,8 @@ class GoogleScraper(Scraper):
             print(
                 'got total {} links for {}'.format(len(links), entry['image'])
             )
-            results.append({'ebay_url': entry['url'], 'amazon_urls': links})
+            results.append({'ebay_link': entry['url'], 'amazon_links': links})
         return results
-
-
-class EbayScraper(Scraper):
-
-    def uniquify(self, data):
-        unique = []
-        seen = []
-        for entry in data:
-            if entry['id'] in seen:
-                continue
-            seen.append(entry['id'])
-            unique.append(entry)
-        print('removed {} duplicates'.format(len(entry) - len(unique)))
-        return unique
-
-    def parse_products(self, soup):
-        products = []
-        for result in soup.select('.sresult'):
-            id_ = result['listingid']
-            url = result.select_one('.lvtitle a')['href']
-            image = result.select_one('.lvpic img')['src']
-            product = {
-                'id': id_,
-                'url': url,
-                'image': image,
-            }
-            products.append(product)
-        print('parsed {} products'.format(len(products)))
-        return products
-
-    def scrape(self, seller):
-        products = []
-        url = 'http://www.ebay.com/sch/m.html?_ssn={}&_pgn=1&_skc=0&_ipg=200&'\
-            'LH_Sold=1&LH_Complete=1'.format(seller)
-        while True:
-            soup = self.get_soup(url)
-            products.extend(self.parse_products(soup))
-            next_url = soup.select_one('.pagn-next a')
-            if not next_url or next_url.get('aria-disabled'):
-                break
-            url = next_url['href'].replace(
-                '&rt=nc', '&_ipg=200&LH_Sold=1&LH_Complete=1'
-            )
-        products = self.uniquify(products)
-        print('got total {} products'.format(len(products)))
-        return products
 
 
 if __name__ == '__main__':
