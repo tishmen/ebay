@@ -1,8 +1,16 @@
+import random
+import time
 import sys
 import json
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+
+random.seed(datetime.now())
+headers = {
+    'user-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:40.0) Gecko/2010'
+        '0101 Firefox/40.0'
+}
 
 
 def uniquify(products):
@@ -17,8 +25,12 @@ def uniquify(products):
     return unique
 
 
-def do_request(url):
-    response = requests.get(url)
+def do_request(url, throttle=False, min_sleep=1, max_sleep=10):
+    if throttle:
+        sleep = random.uniform(min_sleep, max_sleep)
+        print('sleeping {} seconds'.format(sleep))
+        time.sleep(sleep)
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
         raise Exception(
             'bad status code {} for {}'.format(response.status_code, url)
@@ -53,14 +65,17 @@ def parse_products(soup):
 def scrape_products(seller):
     products = []
     url = 'http://www.ebay.com/sch/m.html?_ssn={}&_pgn=1&_skc=0&_ipg=200&LH_S'\
-        'old=1'.format(seller)
+        'old=1&LH_Complete=1'.format(seller)
     while True:
         soup = do_request(url)
         products.extend(parse_products(soup))
         next_url = soup.select_one('.pagn-next a')
         if not next_url or next_url.get('aria-disabled'):
             break
-        url = next_url['href'].replace('&rt=nc', '&_ipg=200&LH_Sold=1')
+        url = next_url['href'].replace(
+            '&rt=nc', '&_ipg=200&LH_Sold=1&LH_Complete=1'
+        )
+    products = uniquify(products)
     print('got total {} products'.format(len(products)))
     return products
 
@@ -72,10 +87,9 @@ if __name__ == '__main__':
     seller = sys.argv[1]
     print('starting scrape for {}'.format(seller))
     products = scrape_products(seller)
-    print('got total {} products'.format(len(products)))
     print('stoping scrape for {}'.format(seller))
     timestamp = datetime.now().isoformat()
-    path = '{}_{}.json'.format(seller, timestamp)
+    path = '{}.json'.format(timestamp)
     with open(path, 'w') as f:
         json.dump(products, f, sort_keys=True, indent=4)
     print('saved out file as {}'.format(path))
