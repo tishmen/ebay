@@ -18,7 +18,7 @@ class Scraper(object):
     def __init__(self):
         self.headers = {
             'user-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:40.0) Ge'
-                'cko/20100101 Firefox/40.0'
+            'cko/20100101 Firefox/40.0'
         }
         self.min_sleep = 1
         self.max_sleep = 10
